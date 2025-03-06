@@ -1,0 +1,13 @@
+[[server]]
+root = "git+ssh:://user@example.com"
+repositories = [
+  { path = "example" }
+  { name = "hi" }
+]
+
+[[server]]
+root = "git+ssh:://user@example.com"
+
+[[server.repositories]]
+path = "example"
+
