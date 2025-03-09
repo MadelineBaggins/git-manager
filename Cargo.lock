@@ -145,6 +145,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "git-manager-xml"
+version = "0.1.0"
+
+[[package]]
+name = "git-manager-xml-test"
+version = "0.1.0"
+dependencies = [
+ "git-manager-xml",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
