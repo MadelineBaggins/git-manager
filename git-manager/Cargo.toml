@@ -1,0 +1,11 @@
+[package]
+name = "git-manager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
+clap_complete = "4.5.46"
+serde = { version = "1.0.218", features = ["derive"] }
+toml = "0.8.20"
+url = { version = "2.5.4", features = ["serde"] }
