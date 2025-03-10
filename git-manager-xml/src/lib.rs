@@ -1,5 +1,8 @@
+use std::{io::Read, path::PathBuf};
+
 #[derive(Clone)]
 pub struct Parser<'a> {
+    path: PathBuf,
     src: &'a str,
     tail: &'a str,
     line: usize,
@@ -8,6 +11,7 @@ pub struct Parser<'a> {
 
 #[derive(Debug)]
 pub struct Error {
+    pub path: PathBuf,
     pub src: String,
     pub message: String,
     pub line: usize,
@@ -21,7 +25,11 @@ impl std::fmt::Display for Error {
     ) -> std::fmt::Result {
         const RED: &str = "\x1b[1;31m";
         const DEFAULT: &str = "\x1b[1;39m";
-        writeln!(f, "{RED}Error:{DEFAULT}")?;
+        writeln!(
+            f,
+            "{RED}Error in '{}':{DEFAULT}",
+            self.path.display()
+        )?;
         for (line_num, line) in
             self.src.split('\n').enumerate()
         {
@@ -49,8 +57,9 @@ impl std::fmt::Display for Error {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(src: &'a str) -> Self {
+    pub fn new(path: PathBuf, src: &'a str) -> Self {
         Self {
+            path,
             src,
             tail: src,
             line: 0,
@@ -59,6 +68,7 @@ impl<'a> Parser<'a> {
     }
     fn error(&mut self, message: String) -> Error {
         Error {
+            path: self.path.clone(),
             src: self.src.into(),
             message,
             line: self.line,
@@ -158,16 +168,65 @@ impl Parse for Option<Result<Element, Error>> {
             Ok(open_tag) => open_tag,
             Err(err) => return Some(Err(err)),
         };
+        // Process any includes in the opening tag
+        let mut contents = vec![];
+        let includes = open_tag
+            .attributes
+            .iter()
+            .filter(|a| a.name == "include")
+            .map(|a| &a.value);
+        for path in includes {
+            // Ensure a path was supplied
+            let Some(path) = path.as_ref() else {
+                return Some(Err(parser.error(
+                    "'include' attributes require a value"
+                        .into(),
+                )));
+            };
+            // Get the relative file path
+            let path = parser
+                .path
+                .parent()
+                .unwrap_or(
+                    &std::env::current_dir().unwrap(),
+                )
+                .join(path);
+            // Ensure we can open the file
+            let Ok(mut file) = std::fs::File::open(&path)
+            else {
+                return Some(Err(parser.error(format!(
+                    "could not open file '{}'",
+                    path.display()
+                ))));
+            };
+            // Read the file to string
+            let mut src = String::new();
+            if file.read_to_string(&mut src).is_err() {
+                return Some(Err(parser.error(format!(
+                    "could not read file '{}'",
+                    path.display()
+                ))));
+            }
+            // Source the included file
+            let mut included = Parser::new(path, &src);
+            while let Some(content) = included
+                .parse::<Option<Result<Content, Error>>>()
+            {
+                match content {
+                    Ok(content) => contents.push(content),
+                    Err(err) => return Some(Err(err)),
+                }
+            }
+        }
         // If the tag was self closing, return the entity
         if open_tag.self_closing {
             return Some(Ok(Element {
                 name: open_tag.name,
                 attributes: open_tag.attributes,
-                contents: vec![],
+                contents,
             }));
         }
         // Parse all the content
-        let mut contents = vec![];
         let close_tag = loop {
             // Remove any whitespace
             parser.take_whitespace();
