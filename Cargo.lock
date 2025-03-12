@@ -139,6 +139,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "clap_complete",
+ "git-manager-xml",
  "serde",
  "toml",
  "url",

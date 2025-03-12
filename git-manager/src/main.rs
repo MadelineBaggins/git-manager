@@ -1,3 +1,9 @@
+use std::path::PathBuf;
+
+use git_manager_xml::Element;
+
+mod cfg;
+
 mod cli {
     use clap::Parser as _;
     use clap::{Command, CommandFactory};
@@ -171,5 +177,32 @@ impl std::fmt::Display for Error {
 }
 
 fn main() {
-    cli::Args::get().command.exec();
+    use cfg::FromElement;
+    use git_manager_xml as xml;
+
+    // cli::Args::get().command.exec();
+    // Read the config
+    let path =
+        PathBuf::from(std::env::args().nth(1).unwrap());
+    let config = std::fs::read_to_string(&path).unwrap();
+    // Parse the config
+    let mut parser = xml::Parser::new(&path, &config);
+    let element = parser
+        .parse::<Option<Result<Element, xml::Error>>>()
+        .unwrap();
+    let element = match element {
+        Ok(e) => e,
+        Err(e) => {
+            println!("{e}");
+            return;
+        }
+    };
+    let config = match cfg::Config::from_element(&element) {
+        Ok(config) => config,
+        Err(e) => {
+            println!("{e}");
+            return;
+        }
+    };
+    println!("{config:#?}")
 }

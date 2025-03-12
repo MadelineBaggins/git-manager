@@ -1,24 +1,34 @@
-use std::{io::Read, path::PathBuf};
+use std::{collections::HashMap, path::Path};
 
 #[derive(Clone)]
 pub struct Parser<'a> {
-    path: PathBuf,
-    src: &'a str,
     tail: &'a str,
-    line: usize,
-    char: usize,
+    position: Position<'a>,
 }
 
-#[derive(Debug)]
-pub struct Error {
-    pub path: PathBuf,
-    pub src: String,
-    pub message: String,
+#[derive(Debug, Clone)]
+pub struct Position<'a> {
+    pub path: &'a Path,
+    pub src: &'a str,
     pub line: usize,
     pub char: usize,
 }
 
-impl std::fmt::Display for Error {
+impl<'a> Position<'a> {
+    pub fn error(&self, message: String) -> Error<'a> {
+        Error {
+            message,
+            position: self.clone(),
+        }
+    }
+}
+#[derive(Debug)]
+pub struct Error<'a> {
+    pub message: String,
+    position: Position<'a>,
+}
+
+impl<'a> std::fmt::Display for Error<'a> {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
@@ -28,18 +38,21 @@ impl std::fmt::Display for Error {
         writeln!(
             f,
             "{RED}Error in '{}':{DEFAULT}",
-            self.path.display()
+            self.position.path.display()
         )?;
         for (line_num, line) in
-            self.src.split('\n').enumerate()
+            self.position.src.split('\n').enumerate()
         {
             writeln!(f, "{line}")?;
-            if line_num == self.line {
-                let offset =
-                    std::iter::repeat_n(' ', self.char)
-                        .collect::<String>();
+            if line_num == self.position.line {
+                let offset = std::iter::repeat_n(
+                    ' ',
+                    self.position.char,
+                )
+                .collect::<String>();
                 writeln!(f, "{offset}^")?;
                 let offset_len = self
+                    .position
                     .char
                     .saturating_sub(self.message.len());
                 let offset =
@@ -57,25 +70,18 @@ impl std::fmt::Display for Error {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(path: PathBuf, src: &'a str) -> Self {
+    pub fn new(path: &'a Path, src: &'a str) -> Self {
         Self {
-            path,
-            src,
             tail: src,
-            line: 0,
-            char: 0,
+            position: Position {
+                src,
+                path,
+                line: 0,
+                char: 0,
+            },
         }
     }
-    fn error(&mut self, message: String) -> Error {
-        Error {
-            path: self.path.clone(),
-            src: self.src.into(),
-            message,
-            line: self.line,
-            char: self.char,
-        }
-    }
-    pub fn parse<T: Parse>(&mut self) -> T {
+    pub fn parse<T: Parse<'a>>(&mut self) -> T {
         T::parse(self)
     }
     fn take_whitespace(&mut self) {
@@ -89,10 +95,10 @@ impl<'a> Parser<'a> {
         let char = self.tail.chars().next()?;
         match char {
             '\n' => {
-                self.line += 1;
-                self.char = 0;
+                self.position.line += 1;
+                self.position.char = 0;
             }
-            _ => self.char += 1,
+            _ => self.position.char += 1,
         }
         (_, self.tail) =
             self.tail.split_at(char.len_utf8());
@@ -104,28 +110,30 @@ impl<'a> Parser<'a> {
         for c in head.chars() {
             match c {
                 '\n' => {
-                    self.line += 1;
-                    self.char = 0;
+                    self.position.line += 1;
+                    self.position.char = 0;
                 }
-                _ => self.char += 1,
+                _ => self.position.char += 1,
             }
         }
         head
     }
 }
 
-pub trait Parse {
-    fn parse(parser: &mut Parser) -> Self;
+pub trait Parse<'a> {
+    fn parse(parser: &mut Parser<'a>) -> Self;
 }
 
 #[derive(Debug)]
-pub enum Content {
-    Element(Element),
+pub enum Content<'a> {
+    Element(Element<'a>),
     Text(String),
 }
 
-impl Parse for Option<Result<Content, Error>> {
-    fn parse(parser: &mut Parser) -> Self {
+impl<'a> Parse<'a>
+    for Option<Result<Content<'a>, Error<'a>>>
+{
+    fn parse(parser: &mut Parser<'a>) -> Self {
         // Clear any whitespace
         parser.take_whitespace();
         // If the document has finished parsing
@@ -153,14 +161,17 @@ impl Parse for Option<Result<Content, Error>> {
 }
 
 #[derive(Debug)]
-pub struct Element {
-    pub name: String,
-    pub attributes: Vec<Attribute>,
-    pub contents: Vec<Content>,
+pub struct Element<'a> {
+    pub name: &'a str,
+    pub attributes: HashMap<&'a str, Attribute<'a>>,
+    pub contents: Vec<Content<'a>>,
+    pub position: Position<'a>,
 }
 
-impl Parse for Option<Result<Element, Error>> {
-    fn parse(parser: &mut Parser) -> Self {
+impl<'a> Parse<'a>
+    for Option<Result<Element<'a>, Error<'a>>>
+{
+    fn parse(parser: &mut Parser<'a>) -> Self {
         // Find the opening tag if there is one
         let open_tag = match parser
             .parse::<Option<Result<OpenTag, Error>>>()?
@@ -168,87 +179,40 @@ impl Parse for Option<Result<Element, Error>> {
             Ok(open_tag) => open_tag,
             Err(err) => return Some(Err(err)),
         };
-        // Process any includes in the opening tag
-        let mut contents = vec![];
-        let includes = open_tag
-            .attributes
-            .iter()
-            .filter(|a| a.name == "include")
-            .map(|a| &a.value);
-        for path in includes {
-            // Ensure a path was supplied
-            let Some(path) = path.as_ref() else {
-                return Some(Err(parser.error(
-                    "'include' attributes require a value"
-                        .into(),
-                )));
-            };
-            // Get the relative file path
-            let path = parser
-                .path
-                .parent()
-                .unwrap_or(
-                    &std::env::current_dir().unwrap(),
-                )
-                .join(path);
-            // Ensure we can open the file
-            let Ok(mut file) = std::fs::File::open(&path)
-            else {
-                return Some(Err(parser.error(format!(
-                    "could not open file '{}'",
-                    path.display()
-                ))));
-            };
-            // Read the file to string
-            let mut src = String::new();
-            if file.read_to_string(&mut src).is_err() {
-                return Some(Err(parser.error(format!(
-                    "could not read file '{}'",
-                    path.display()
-                ))));
-            }
-            // Source the included file
-            let mut included = Parser::new(path, &src);
-            while let Some(content) = included
-                .parse::<Option<Result<Content, Error>>>()
-            {
-                match content {
-                    Ok(content) => contents.push(content),
-                    Err(err) => return Some(Err(err)),
-                }
-            }
-        }
         // If the tag was self closing, return the entity
+        let mut contents = vec![];
         if open_tag.self_closing {
             return Some(Ok(Element {
                 name: open_tag.name,
+                position: open_tag.position,
                 attributes: open_tag.attributes,
                 contents,
             }));
         }
         // Parse all the content
-        let close_tag = loop {
-            // Remove any whitespace
-            parser.take_whitespace();
-            // Check if there's a closing tag
-            if let Some(close_tag) = parser
+        let close_tag =
+            loop {
+                // Remove any whitespace
+                parser.take_whitespace();
+                // Check if there's a closing tag
+                if let Some(close_tag) = parser
                 .parse::<Option<Result<CloseTag, Error>>>()
             {
                 break close_tag;
             }
-            // Otherwise, try to get content
-            match parser
+                // Otherwise, try to get content
+                match parser
                 .parse::<Option<Result<Content, Error>>>()
             {
                 Some(Err(err)) => return Some(Err(err)),
                 Some(Ok(content)) => contents.push(content),
                 None => {
-                    return Some(Err(parser.error(
+                    return Some(Err(parser.position.error(
                         "missing closing tag".into(),
                     )))
                 }
             }
-        };
+            };
         // Ensure we didn't error getting the close tag
         let close_tag = match close_tag {
             Ok(close_tag) => close_tag,
@@ -257,12 +221,14 @@ impl Parse for Option<Result<Element, Error>> {
         // Ensure the close and open tags match
         if open_tag.name != close_tag.name {
             return Some(Err(parser
+                .position
                 .error("mismatched closing tag".into())));
         }
         Some(Ok(Element {
             name: open_tag.name,
             attributes: open_tag.attributes,
             contents,
+            position: open_tag.position,
         }))
     }
 }
@@ -272,10 +238,10 @@ impl Parse for Option<Result<Element, Error>> {
 /// - Cannot start with the letters "xml" in any case.
 /// - Consists only of letters, digits, hyphens,
 ///   underscores, and periods.
-struct Name(String);
+struct Name<'a>(&'a str);
 
-impl Parse for Option<Name> {
-    fn parse(parser: &mut Parser) -> Option<Name> {
+impl<'a> Parse<'a> for Option<Name<'a>> {
+    fn parse(parser: &mut Parser<'a>) -> Self {
         // Ensure tail starts with a letter or underscore
         if !parser.tail.starts_with(|c: char| {
             c.is_alphabetic() || c == '_'
@@ -300,19 +266,21 @@ impl Parse for Option<Name> {
             })
             .unwrap_or(parser.tail.len());
         let name = parser.tail.get(..len).unwrap();
-        (!name.is_empty())
-            .then_some(Name(parser.take(len).into()))
+        (!name.is_empty()).then_some(Name(parser.take(len)))
     }
 }
 
-struct OpenTag {
-    name: String,
-    attributes: Vec<Attribute>,
+struct OpenTag<'a> {
+    name: &'a str,
+    attributes: HashMap<&'a str, Attribute<'a>>,
     self_closing: bool,
+    position: Position<'a>,
 }
 
-impl Parse for Option<Result<OpenTag, Error>> {
-    fn parse(parser: &mut Parser) -> Self {
+impl<'a> Parse<'a>
+    for Option<Result<OpenTag<'a>, Error<'a>>>
+{
+    fn parse(parser: &mut Parser<'a>) -> Self {
         // Ensure we're parsing an open tag
         if !parser.tail.starts_with('<') {
             return None;
@@ -324,17 +292,27 @@ impl Parse for Option<Result<OpenTag, Error>> {
             parser.parse::<Option<Name>>()
         else {
             return Some(Err(parser
+                .position
                 .error("expected element name".into())));
         };
         // Skip any whitespace
         parser.take_whitespace();
         // Parse any attributes
-        let mut attributes = vec![];
+        let mut attributes = HashMap::new();
         while let Some(attribute) = parser
             .parse::<Option<Result<Attribute, Error>>>()
         {
             match attribute {
-                Ok(attribute) => attributes.push(attribute),
+                Ok(attribute) => {
+                    if let Some(old) = attributes
+                        .insert(attribute.name, attribute)
+                    {
+                        let duplicate = attributes
+                            .get(old.name)
+                            .unwrap();
+                        return Some(Err(duplicate.position.error(format!("found duplicate '{}' attribute", old.name))));
+                    }
+                }
                 Err(e) => return Some(Err(e)),
             }
             parser.take_whitespace();
@@ -342,9 +320,9 @@ impl Parse for Option<Result<OpenTag, Error>> {
         // Ensure the opening tag ends with '/>' or '>'.
         let self_closing = parser.tail.starts_with("/>");
         if !self_closing && !parser.tail.starts_with(">") {
-            return Some(Err(
-                parser.error("expected '>' or '/>'".into())
-            ));
+            return Some(Err(parser
+                .position
+                .error("expected '>' or '/>'".into())));
         }
         // Skip the ending bit
         if self_closing {
@@ -357,18 +335,22 @@ impl Parse for Option<Result<OpenTag, Error>> {
             name,
             attributes,
             self_closing,
+            position: parser.position.clone(),
         }))
     }
 }
 
 #[derive(Debug)]
-pub struct Attribute {
-    pub name: String,
+pub struct Attribute<'a> {
+    pub name: &'a str,
     pub value: Option<String>,
+    pub position: Position<'a>,
 }
 
-impl Parse for Option<Result<Attribute, Error>> {
-    fn parse(parser: &mut Parser) -> Self {
+impl<'a> Parse<'a>
+    for Option<Result<Attribute<'a>, Error<'a>>>
+{
+    fn parse(parser: &mut Parser<'a>) -> Self {
         // Clone the parser in case we need to restore it
         let backup = parser.clone();
         // Get the name of the attribute
@@ -384,6 +366,7 @@ impl Parse for Option<Result<Attribute, Error>> {
             return Some(Ok(Attribute {
                 name,
                 value: None,
+                position: parser.position.clone(),
             }));
         }
         // Skip the '='
@@ -392,20 +375,21 @@ impl Parse for Option<Result<Attribute, Error>> {
         let Some(AttributeValue(value)) =
             parser.parse::<Option<AttributeValue>>()
         else {
-            return Some(Err(parser.error(
+            return Some(Err(parser.position.error(
                 "expected attribute value".into(),
             )));
         };
         Some(Ok(Attribute {
             name,
             value: Some(value),
+            position: parser.position.clone(),
         }))
     }
 }
 
 struct AttributeValue(String);
 
-impl Parse for Option<AttributeValue> {
+impl<'a> Parse<'a> for Option<AttributeValue> {
     fn parse(parser: &mut Parser) -> Self {
         // Ensure the parser starts with a single or double
         // quote.
@@ -438,12 +422,14 @@ impl Parse for Option<AttributeValue> {
     }
 }
 
-struct CloseTag {
-    name: String,
+struct CloseTag<'a> {
+    name: &'a str,
 }
 
-impl Parse for Option<Result<CloseTag, Error>> {
-    fn parse(parser: &mut Parser) -> Self {
+impl<'a> Parse<'a>
+    for Option<Result<CloseTag<'a>, Error<'a>>>
+{
+    fn parse(parser: &mut Parser<'a>) -> Self {
         // Ensure we're at the start of a closing tag
         if !parser.tail.starts_with("</") {
             return None;
@@ -454,13 +440,14 @@ impl Parse for Option<Result<CloseTag, Error>> {
             parser.parse::<Option<Name>>()
         else {
             return Some(Err(parser
+                .position
                 .error("expected element name".into())));
         };
         // Ensure we end with a '>'.
         if !parser.tail.starts_with('>') {
-            return Some(Err(
-                parser.error("expected '>'".into())
-            ));
+            return Some(Err(parser
+                .position
+                .error("expected '>'".into())));
         }
         // Skip the '>'.
         parser.take(">".len());
