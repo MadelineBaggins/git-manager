@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use git_manager_xml::Element;
+use maddi_xml::Element;
 
 mod cfg;
 
@@ -177,8 +177,7 @@ impl std::fmt::Display for Error {
 }
 
 fn main() {
-    use cfg::FromElement;
-    use git_manager_xml as xml;
+    use maddi_xml::{self as xml, FromElement};
 
     // cli::Args::get().command.exec();
     // Read the config
