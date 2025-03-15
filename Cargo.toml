@@ -3,5 +3,4 @@ resolver = "2"
 members = [
   "git-manager",
   "git-manager-xml",
-  "git-manager-xml-test",
 ]

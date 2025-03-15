@@ -1,6 +1,0 @@
-<root>
-  <item>
-    Here is some text
-    <div include="repo.xml"/>
-  </item>
-</root>

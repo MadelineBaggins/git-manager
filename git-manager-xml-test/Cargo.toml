@@ -1,7 +1,0 @@
-[package]
-name = "git-manager-xml-test"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-git-manager-xml = { path = "../git-manager-xml" }
