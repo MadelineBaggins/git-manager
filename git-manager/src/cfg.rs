@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use maddi_xml::{self as xml, FromElement, Result};
+use maddi_xml::{
+    self as xml, Element, FromElement, Parse, Result,
+};
 
 #[derive(Debug)]
 struct Symlink {
@@ -26,7 +28,6 @@ impl<'a, 'b> FromElement<'a, 'b> for Symlink {
 #[derive(Debug)]
 pub struct Repository {
     name: String,
-    public: bool,
     symlinks: Vec<Symlink>,
 }
 
@@ -36,7 +37,6 @@ impl<'a, 'b> FromElement<'a, 'b> for Repository {
     ) -> Result<'a, Self> {
         Ok(Self {
             name: element.attribute::<&str>("name")?.into(),
-            public: element.attribute("public")?,
             symlinks: element
                 .children::<Symlink>("symlink")
                 .collect::<Result<_>>()?,
@@ -46,6 +46,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Repository {
 
 #[derive(Debug)]
 pub struct Config {
+    store: PathBuf,
     repositories: Vec<Repository>,
 }
 
@@ -54,6 +55,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Config {
         element: &'b xml::Element<'a>,
     ) -> Result<'a, Self> {
         Ok(Self {
+            store: element.child("store")?,
             repositories: element
                 .children::<Repository>("repo")
                 .collect::<Result<_>>()?,

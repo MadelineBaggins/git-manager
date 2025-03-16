@@ -1,157 +1,43 @@
-use std::path::PathBuf;
+use std::{
+    fs::{self, File},
+    io::Read,
+    path::PathBuf,
+};
 
-use maddi_xml::Element;
+use cfg::Config;
+use clap::Parser as _;
+use maddi_xml::{Content, Element, FromElement, Parser};
 
 mod cfg;
 
 mod cli {
-    use clap::Parser as _;
-    use clap::{Command, CommandFactory};
-    use clap_complete::{generate, Generator, Shell};
-
     #[derive(clap::Parser)]
     pub struct Args {
-        pub config: Option<std::path::PathBuf>,
+        #[arg(short, default_value = "./config.xml")]
+        pub config: std::path::PathBuf,
         #[command(subcommand)]
         pub command: Commands,
     }
 
-    impl Args {
-        const POST_UPDATE: Args = Args {
-            config: None,
-            command: Commands::PostUpdate,
-        };
-        pub fn get() -> Self {
-            let name = std::env::args().next();
-            match name.as_deref() {
-                Some("post_update") => Self::POST_UPDATE,
-                Some(cmd)
-                    if cmd.ends_with("/post_update") =>
-                {
-                    Self::POST_UPDATE
-                }
-                _ => Args::parse(),
-            }
-        }
-    }
-
     #[derive(clap::Subcommand)]
     pub enum Commands {
-        PostUpdate,
-        Completions {
-            shell: Shell,
-        },
-        Server {
-            #[command(subcommand)]
-            subcommand: ServerCommand,
-        },
-    }
-
-    impl Commands {
-        pub fn exec(self) {
-            match self {
-                Commands::Completions { shell } => {
-                    let mut cmd = Args::command();
-                    print_completions(shell, &mut cmd)
-                }
-                Commands::PostUpdate => {
-                    println!("Running 'post_update'...");
-                }
-                Commands::Server { subcommand } => {
-                    subcommand.exec()
-                }
-            }
-        }
-    }
-
-    fn print_completions<G: Generator>(
-        generator: G,
-        cmd: &mut Command,
-    ) {
-        generate(
-            generator,
-            cmd,
-            cmd.get_name().to_string(),
-            &mut std::io::stdout(),
-        )
-    }
-
-    #[derive(clap::Subcommand)]
-    pub enum ServerCommand {
         Init,
     }
-
-    impl ServerCommand {
-        fn exec(self) {
-            match self {
-                ServerCommand::Init => Self::init(),
-            }
-        }
-        fn init() {
-            use std::process::Command;
-            // Create the
-            Command::new("git")
-                .args(["init", "by-id/admin"])
-                .output()
-                .expect("Could not run `git init admin`");
-        }
-    }
 }
 
-mod config {
-    #[derive(serde::Deserialize, serde::Serialize)]
-    pub struct Config {
-        pub server: Vec<Server>,
-    }
-
-    impl Default for Config {
-        fn default() -> Self {
-            Self {
-                server: vec![Server::default()],
-            }
-        }
-    }
-
-    #[derive(serde::Deserialize, serde::Serialize)]
-    pub struct Server {
-        pub root: url::Url,
-        #[serde(alias = "repository")]
-        pub repositories: Vec<Repository>,
-    }
-
-    impl Default for Server {
-        fn default() -> Self {
-            Server {
-                root: "git+ssh:://user@example.com"
-                    .try_into()
-                    .unwrap(),
-                repositories: vec![Repository::default()],
-            }
-        }
-    }
-
-    #[derive(serde::Deserialize, serde::Serialize)]
-    pub struct Repository {
-        pub path: String,
-    }
-
-    impl Default for Repository {
-        fn default() -> Self {
-            Repository {
-                path: "example".to_string(),
-            }
-        }
-    }
-}
-
-pub mod esc {
-    pub const RED: &str = "\x1b[1;31m";
-    pub const DEFAULT: &str = "\x1b[1;39m";
-}
+const RED: &str = "\x1b[1;31m";
+const DEFAULT: &str = "\x1b[1;39m";
 
 enum Error {
-    CouldNotOpenFile(std::path::PathBuf),
-    InvalidToml(std::path::PathBuf, toml::de::Error),
+    FailedToOpenConfig(PathBuf),
+    FailedToReadConfig(PathBuf),
+    MaddiXml(String),
+}
+
+impl<'a> From<maddi_xml::Error<'a>> for Error {
+    fn from(value: maddi_xml::Error<'a>) -> Self {
+        Self::MaddiXml(format!("{value}"))
+    }
 }
 
 impl std::fmt::Display for Error {
@@ -159,49 +45,85 @@ impl std::fmt::Display for Error {
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        use esc::*;
         match self {
-            Error::CouldNotOpenFile(file) => write!(
-                f,
-                "Could not open file \"{}\"",
-                file.display()
-            ),
-            Error::InvalidToml(file, error) => write!(
-                f,
-                "Invalid toml in file \"{}\"\n{RED}Internal Error{DEFAULT}:\n{:?}",
-                file.display(),
-                error,
-            ),
+            Error::FailedToOpenConfig(path) => {
+                write!(f, "{RED}Error:\n{DEFAULT}")?;
+                write!(
+                    f,
+                    "failed to open config file '{}'",
+                    path.display()
+                )
+            }
+            Error::FailedToReadConfig(path) => {
+                write!(f, "{RED}Error:\n{DEFAULT}")?;
+                write!(
+                    f,
+                    "failed to read config file '{}'",
+                    path.display()
+                )
+            }
+            Error::MaddiXml(raw) => write!(f, "{raw}"),
         }
     }
 }
 
 fn main() {
-    use maddi_xml::{self as xml, FromElement};
+    // Get the args supplied to the program
+    let args = cli::Args::parse();
+    // Run the program, printing out any errors
+    if let Err(err) = run(args) {
+        println!("{err}");
+    }
+}
 
-    // cli::Args::get().command.exec();
-    // Read the config
-    let path =
-        PathBuf::from(std::env::args().nth(1).unwrap());
-    let config = std::fs::read_to_string(&path).unwrap();
-    // Parse the config
-    let mut parser = xml::Parser::new(&path, &config);
-    let element = parser
-        .parse::<Option<Result<Element, xml::Error>>>()
-        .unwrap();
-    let element = match element {
-        Ok(e) => e,
-        Err(e) => {
-            println!("{e}");
-            return;
-        }
-    };
-    let config = match cfg::Config::from_element(&element) {
-        Ok(config) => config,
-        Err(e) => {
-            println!("{e}");
-            return;
-        }
-    };
-    println!("{config:#?}")
+fn run(args: cli::Args) -> Result<(), Error> {
+    // Try to open the configuration file
+    let config = Config::load(args.config)?;
+    Ok(())
+}
+
+impl Config {
+    fn load(path: PathBuf) -> Result<Self, Error> {
+        // Open the configuration file
+        let Ok(mut file) = File::open(&path) else {
+            return Err(Error::FailedToOpenConfig(path));
+        };
+        // Read in the configuration file
+        let mut source = String::new();
+        if file.read_to_string(&mut source).is_err() {
+            return Err(Error::FailedToReadConfig(path));
+        };
+        // Create the parser
+        let mut parser = Parser::new(&path, &source);
+        // Get the first piece of content in the file
+        let content =
+            parser.parse::<Option<Result<Content, maddi_xml::Error>>>().transpose()?;
+        // Ensure the content was an element named 'config'
+        let element = match content {
+            Some(Content::Element(e)) => {
+                if e.name == "config" {
+                    e
+                } else {
+                    return Err(e
+                        .position
+                        .error(
+                            "expected 'config' element"
+                                .into(),
+                        )
+                        .into());
+                }
+            }
+            _ => {
+                return Err(parser
+                    .position
+                    .error(
+                        "expected 'config' element".into(),
+                    )
+                    .into())
+            }
+        };
+        // Get the config from the xml ast
+        let config = Config::from_element(&element)?;
+        Ok(config)
+    }
 }

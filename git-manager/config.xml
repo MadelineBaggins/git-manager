@@ -1,4 +1,6 @@
 <config>
+  <store>/home/dbaggins/GitManager/store</store>
+  <symlinks>/home/dbaggins/GitManager/symlinks</symlinks>
   <repo name="2025-03-12-example-rust-aarch64-asm">
     <symlink>example/rust/aarch64-asm-interop</symlink>
   </repo>
