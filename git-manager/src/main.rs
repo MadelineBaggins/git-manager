@@ -1,12 +1,8 @@
-use std::{
-    fs::{self, File},
-    io::Read,
-    path::PathBuf,
-};
+use std::{fs::File, io::Read, path::PathBuf};
 
 use cfg::Config;
 use clap::Parser as _;
-use maddi_xml::{Content, Element, FromElement, Parser};
+use maddi_xml::{Content, FromElement, Parser};
 
 mod cfg;
 
@@ -28,10 +24,12 @@ mod cli {
 const RED: &str = "\x1b[1;31m";
 const DEFAULT: &str = "\x1b[1;39m";
 
-enum Error {
+pub enum Error {
     FailedToOpenConfig(PathBuf),
     FailedToReadConfig(PathBuf),
     MaddiXml(String),
+    FailedToInitRepository(PathBuf),
+    FailedToConfigureRepository(PathBuf),
 }
 
 impl<'a> From<maddi_xml::Error<'a>> for Error {
@@ -47,7 +45,7 @@ impl std::fmt::Display for Error {
     ) -> std::fmt::Result {
         match self {
             Error::FailedToOpenConfig(path) => {
-                write!(f, "{RED}Error:\n{DEFAULT}")?;
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
                 write!(
                     f,
                     "failed to open config file '{}'",
@@ -55,7 +53,7 @@ impl std::fmt::Display for Error {
                 )
             }
             Error::FailedToReadConfig(path) => {
-                write!(f, "{RED}Error:\n{DEFAULT}")?;
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
                 write!(
                     f,
                     "failed to read config file '{}'",
@@ -63,23 +61,24 @@ impl std::fmt::Display for Error {
                 )
             }
             Error::MaddiXml(raw) => write!(f, "{raw}"),
+            Error::FailedToInitRepository(path) => {
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
+                write!(
+                    f,
+                    "failed to create repository '{}'",
+                    path.display()
+                )
+            }
+            Error::FailedToConfigureRepository(path) => {
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
+                write!(
+                    f,
+                    "failed to configure repository '{}'",
+                    path.display()
+                )
+            }
         }
     }
-}
-
-fn main() {
-    // Get the args supplied to the program
-    let args = cli::Args::parse();
-    // Run the program, printing out any errors
-    if let Err(err) = run(args) {
-        println!("{err}");
-    }
-}
-
-fn run(args: cli::Args) -> Result<(), Error> {
-    // Try to open the configuration file
-    let config = Config::load(args.config)?;
-    Ok(())
 }
 
 impl Config {
@@ -126,4 +125,42 @@ impl Config {
         let config = Config::from_element(&element)?;
         Ok(config)
     }
+}
+
+fn main() {
+    // Get the args supplied to the program
+    let args = cli::Args::parse();
+    // Run the program, printing out any errors
+    if let Err(err) = run(args) {
+        println!("{err}");
+    }
+}
+
+fn run(args: cli::Args) -> Result<(), Error> {
+    // Try to open the configuration file
+    let config = Config::load(args.config)?;
+    // Run the command
+    match args.command {
+        cli::Commands::Init => handle_init(config)?,
+    }
+    Ok(())
+}
+
+fn handle_init(config: Config) -> Result<(), Error> {
+    for repo in config.repositories {
+        // Ensure the repository exists
+        repo.ensure_exists(&config.store)?;
+        // Create all the symlinks
+        for target in repo.symlinks(&config.root) {
+            // Ensure the parent directory exists
+            std::fs::create_dir_all(
+                target.parent().unwrap(),
+            )
+            .unwrap();
+            // Create the symlink
+            // std::os::unix::fs::symlink(original, link)
+            todo!()
+        }
+    }
+    Ok(())
 }

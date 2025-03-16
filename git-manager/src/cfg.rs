@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use maddi_xml::{
     self as xml, Element, FromElement, Parse, Result,
@@ -31,6 +34,52 @@ pub struct Repository {
     symlinks: Vec<Symlink>,
 }
 
+impl Repository {
+    pub fn ensure_exists(
+        &self,
+        store: &Path,
+    ) -> std::result::Result<PathBuf, crate::Error> {
+        // Check if the repository already exists
+        let store_path = store.join(&self.name);
+        if store_path.exists() {
+            return Ok(store_path);
+        }
+        // Create the repository
+        Command::new("git")
+            .arg("init")
+            .arg(&store_path)
+            .output()
+            .map_err(|_| {
+                crate::Error::FailedToInitRepository(
+                    store_path.clone(),
+                )
+            })?;
+        // Configure the repository to accept pushes
+        Command::new("git")
+            .args([
+                "config",
+                "--local",
+                "receive.denyCurrentBranch",
+                "updateInstead",
+            ])
+            .current_dir(&store_path)
+            .output()
+            .map_err(|_| {
+                crate::Error::FailedToConfigureRepository(
+                    store_path.clone(),
+                )
+            })?;
+        Ok(store_path)
+    }
+
+    pub fn symlinks<'a, 'b>(
+        &'a self,
+        root: &'b Path,
+    ) -> impl Iterator<Item = PathBuf> + use<'a, 'b> {
+        self.symlinks.iter().map(|s| root.join(&s.path))
+    }
+}
+
 impl<'a, 'b> FromElement<'a, 'b> for Repository {
     fn from_element(
         element: &'b xml::Element<'a>,
@@ -46,8 +95,9 @@ impl<'a, 'b> FromElement<'a, 'b> for Repository {
 
 #[derive(Debug)]
 pub struct Config {
-    store: PathBuf,
-    repositories: Vec<Repository>,
+    pub store: PathBuf,
+    pub root: PathBuf,
+    pub repositories: Vec<Repository>,
 }
 
 impl<'a, 'b> FromElement<'a, 'b> for Config {
@@ -56,6 +106,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Config {
     ) -> Result<'a, Self> {
         Ok(Self {
             store: element.child("store")?,
+            root: element.child("root")?,
             repositories: element
                 .children::<Repository>("repo")
                 .collect::<Result<_>>()?,
