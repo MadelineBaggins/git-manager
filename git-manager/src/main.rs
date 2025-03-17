@@ -17,7 +17,7 @@ mod cli {
 
     #[derive(clap::Subcommand)]
     pub enum Commands {
-        Init,
+        Switch,
     }
 }
 
@@ -30,6 +30,7 @@ pub enum Error {
     MaddiXml(String),
     FailedToInitRepository(PathBuf),
     FailedToConfigureRepository(PathBuf),
+    FailedToCreateSymlink(PathBuf, PathBuf),
 }
 
 impl<'a> From<maddi_xml::Error<'a>> for Error {
@@ -75,6 +76,18 @@ impl std::fmt::Display for Error {
                     f,
                     "failed to configure repository '{}'",
                     path.display()
+                )
+            }
+            Error::FailedToCreateSymlink(
+                source,
+                target,
+            ) => {
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
+                write!(
+                    f,
+                    "failed to create symlink '{} -> {}'",
+                    source.display(),
+                    target.display()
                 )
             }
         }
@@ -141,7 +154,7 @@ fn run(args: cli::Args) -> Result<(), Error> {
     let config = Config::load(args.config)?;
     // Run the command
     match args.command {
-        cli::Commands::Init => handle_init(config)?,
+        cli::Commands::Switch => handle_init(config)?,
     }
     Ok(())
 }
@@ -149,17 +162,22 @@ fn run(args: cli::Args) -> Result<(), Error> {
 fn handle_init(config: Config) -> Result<(), Error> {
     for repo in config.repositories {
         // Ensure the repository exists
-        repo.ensure_exists(&config.store)?;
+        let path = repo.ensure_exists(&config.store)?;
         // Create all the symlinks
-        for target in repo.symlinks(&config.root) {
+        for target in repo.symlinks(&config.symlinks) {
             // Ensure the parent directory exists
             std::fs::create_dir_all(
                 target.parent().unwrap(),
             )
             .unwrap();
             // Create the symlink
-            // std::os::unix::fs::symlink(original, link)
-            todo!()
+            std::os::unix::fs::symlink(&path, &target)
+                .map_err(|_| {
+                    Error::FailedToCreateSymlink(
+                        path.clone(),
+                        target.clone(),
+                    )
+                })?;
         }
     }
     Ok(())

@@ -3,9 +3,7 @@ use std::{
     process::Command,
 };
 
-use maddi_xml::{
-    self as xml, Element, FromElement, Parse, Result,
-};
+use maddi_xml::{self as xml, FromElement, Result};
 
 #[derive(Debug)]
 struct Symlink {
@@ -74,9 +72,11 @@ impl Repository {
 
     pub fn symlinks<'a, 'b>(
         &'a self,
-        root: &'b Path,
+        symlinks_dir: &'b Path,
     ) -> impl Iterator<Item = PathBuf> + use<'a, 'b> {
-        self.symlinks.iter().map(|s| root.join(&s.path))
+        self.symlinks
+            .iter()
+            .map(|s| symlinks_dir.join(&s.path))
     }
 }
 
@@ -87,7 +87,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Repository {
         Ok(Self {
             name: element.attribute::<&str>("name")?.into(),
             symlinks: element
-                .children::<Symlink>("symlink")
+                .children::<Symlink>("symlinks")
                 .collect::<Result<_>>()?,
         })
     }
@@ -96,7 +96,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Repository {
 #[derive(Debug)]
 pub struct Config {
     pub store: PathBuf,
-    pub root: PathBuf,
+    pub symlinks: PathBuf,
     pub repositories: Vec<Repository>,
 }
 
@@ -106,7 +106,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Config {
     ) -> Result<'a, Self> {
         Ok(Self {
             store: element.child("store")?,
-            root: element.child("root")?,
+            symlinks: element.child("symlink")?,
             repositories: element
                 .children::<Repository>("repo")
                 .collect::<Result<_>>()?,
