@@ -320,9 +320,9 @@ checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
 name = "maddi-xml"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45d93174b268a8c8ff8ba8dfd0139c2867f3875aedf4cf465794503da4c7c316"
+checksum = "600415797aef0b89ea95d2ec6ebd51e29fca0ffd1ed003134be0f2150e7cf442"
 
 [[package]]
 name = "memchr"

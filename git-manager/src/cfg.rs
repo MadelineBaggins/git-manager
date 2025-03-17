@@ -87,7 +87,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Repository {
         Ok(Self {
             name: element.attribute::<&str>("name")?.into(),
             symlinks: element
-                .children::<Symlink>("symlinks")
+                .children::<Symlink>("symlink")
                 .collect::<Result<_>>()?,
         })
     }
@@ -106,7 +106,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Config {
     ) -> Result<'a, Self> {
         Ok(Self {
             store: element.child("store")?,
-            symlinks: element.child("symlink")?,
+            symlinks: element.child("symlinks")?,
             repositories: element
                 .children::<Repository>("repo")
                 .collect::<Result<_>>()?,

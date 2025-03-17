@@ -1,4 +1,6 @@
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{
+    fs::File, io::Read, path::PathBuf, process::Command,
+};
 
 use cfg::Config;
 use clap::Parser as _;
@@ -160,6 +162,7 @@ fn run(args: cli::Args) -> Result<(), Error> {
 }
 
 fn handle_init(config: Config) -> Result<(), Error> {
+    println!("{config:#?}");
     for repo in config.repositories {
         // Ensure the repository exists
         let path = repo.ensure_exists(&config.store)?;
@@ -171,7 +174,11 @@ fn handle_init(config: Config) -> Result<(), Error> {
             )
             .unwrap();
             // Create the symlink
-            std::os::unix::fs::symlink(&path, &target)
+            Command::new("ln")
+                .arg("-s")
+                .arg(&path)
+                .arg(&target)
+                .output()
                 .map_err(|_| {
                     Error::FailedToCreateSymlink(
                         path.clone(),
