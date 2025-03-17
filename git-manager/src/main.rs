@@ -1,5 +1,8 @@
 use std::{
-    fs::File, io::Read, path::PathBuf, process::Command,
+    fs::File,
+    io::{Read, Write},
+    path::PathBuf,
+    process::Command,
 };
 
 use cfg::Config;
@@ -19,6 +22,7 @@ mod cli {
 
     #[derive(clap::Subcommand)]
     pub enum Commands {
+        Init,
         Switch,
     }
 }
@@ -33,6 +37,8 @@ pub enum Error {
     FailedToInitRepository(PathBuf),
     FailedToConfigureRepository(PathBuf),
     FailedToCreateSymlink(PathBuf, PathBuf),
+    ConfigExists(PathBuf),
+    FailedToFindEnvVar(&'static str),
 }
 
 impl<'a> From<maddi_xml::Error<'a>> for Error {
@@ -91,6 +97,15 @@ impl std::fmt::Display for Error {
                     source.display(),
                     target.display()
                 )
+            }
+            Error::ConfigExists(path) => {
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
+                let path = path.display();
+                write!(f, "config already exists at '{path}', could not initialize")
+            }
+            Error::FailedToFindEnvVar(var) => {
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
+                write!(f, "failed to get env var '{var}'")
             }
         }
     }
@@ -152,17 +167,40 @@ fn main() {
 }
 
 fn run(args: cli::Args) -> Result<(), Error> {
-    // Try to open the configuration file
-    let config = Config::load(args.config)?;
     // Run the command
     match args.command {
-        cli::Commands::Switch => handle_init(config)?,
+        cli::Commands::Init => handle_init(args)?,
+        cli::Commands::Switch => handle_switch(args)?,
     }
     Ok(())
 }
 
-fn handle_init(config: Config) -> Result<(), Error> {
+fn handle_init(args: cli::Args) -> Result<(), Error> {
+    // Ensure the config file doesn't already exist
+    if args.config.exists() {
+        return Err(Error::ConfigExists(args.config));
+    }
+    // Build the configuration file
+    let home = std::env::var_os("HOME")
+        .ok_or(Error::FailedToFindEnvVar("HOME"))?;
+    let config = include_str!("../config.xml")
+        .replace("$HOME", home.to_str().unwrap());
+    // Write the example configuration file
+    std::fs::File::options()
+        .create_new(true)
+        .open(args.config)
+        .unwrap()
+        .write_all(config.as_bytes())
+        .unwrap();
+    Ok(())
+}
+
+fn handle_switch(args: cli::Args) -> Result<(), Error> {
+    // Try to open the configuration file
+    let config = Config::load(args.config)?;
+    // Print the configuration
     println!("{config:#?}");
+    // Reconfigure everything to match the config
     for repo in config.repositories {
         // Ensure the repository exists
         let path = repo.ensure_exists(&config.store)?;
