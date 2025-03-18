@@ -202,6 +202,10 @@ fn handle_init(args: cli::Args) -> Result<(), Error> {
         .unwrap()
         .write_all(config.as_bytes())
         .unwrap();
+    // Run git init
+    Command::new("git").arg("init").output().map_err(
+        |_| Error::FailedToInitRepository(".".into()),
+    )?;
     Ok(())
 }
 

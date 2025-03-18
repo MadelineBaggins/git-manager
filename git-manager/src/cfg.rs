@@ -246,7 +246,7 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Config {
     ) -> xml::Result<'a, Self> {
         Ok(Self {
             store: element.child("store")?,
-            symlinks: element.child("symlinks")?,
+            symlinks: element.child("symlink")?,
             repositories: element
                 .children::<Repository>("repo")
                 .collect::<xml::Result<_>>()?,
