@@ -1,5 +1,5 @@
 <config>
-  <store>$HOME/GitManager</store>
+  <store>$HOME/GitManager/store</store>
   <symlinks>$HOME/GitManager</symlinks>
   <repo name="admin">
     <symlink>admin</symlink>
