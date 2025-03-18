@@ -2,7 +2,7 @@
   <store>$HOME/git-manager</store>
   <symlinks>$HOME</symlinks>
   <repo name="admin">
-    <alias>admin</alias>
+    <symlink>admin</symlink>
     <post-receive>
       #!/user/bin/env/bash
       cd ..
