@@ -39,6 +39,7 @@ pub enum Error {
     FailedToCreateSymlink(PathBuf, PathBuf),
     ConfigExists(PathBuf),
     FailedToFindEnvVar(&'static str),
+    FailedToConfigureHooks(PathBuf),
 }
 
 impl<'a> From<maddi_xml::Error<'a>> for Error {
@@ -106,6 +107,14 @@ impl std::fmt::Display for Error {
             Error::FailedToFindEnvVar(var) => {
                 writeln!(f, "{RED}Error:{DEFAULT}")?;
                 write!(f, "failed to get env var '{var}'")
+            }
+            Error::FailedToConfigureHooks(path) => {
+                writeln!(f, "{RED}Error:{DEFAULT}")?;
+                write!(
+                    f,
+                    "failed configure hooks for '{}'",
+                    path.display(),
+                )
             }
         }
     }
@@ -187,6 +196,7 @@ fn handle_init(args: cli::Args) -> Result<(), Error> {
         .replace("$HOME", home.to_str().unwrap());
     // Write the example configuration file
     std::fs::File::options()
+        .write(true)
         .create_new(true)
         .open(args.config)
         .unwrap()
@@ -203,7 +213,7 @@ fn handle_switch(args: cli::Args) -> Result<(), Error> {
     // Reconfigure everything to match the config
     for repo in config.repositories {
         // Ensure the repository exists
-        let path = repo.ensure_exists(&config.store)?;
+        let path = repo.ensure_correct(&config.store)?;
         // Create all the symlinks
         for target in repo.symlinks(&config.symlinks) {
             // Ensure the parent directory exists

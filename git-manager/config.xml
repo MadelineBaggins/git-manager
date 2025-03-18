@@ -1,7 +1,13 @@
 <config>
   <store>$HOME/git-manager</store>
   <symlinks>$HOME</symlinks>
-  <repo name="2025-03-12-example-rust-aarch64-asm">
-    <symlink>example/rust/aarch64-asm-interop</symlink>
+  <repo name="admin">
+    <alias>admin</alias>
+    <post-receive>
+      #!/user/bin/env/bash
+      cd ..
+      git --git-dir=.git reset --hard
+      git-manager switch
+    </post-receive>
   </repo>
 </config>
