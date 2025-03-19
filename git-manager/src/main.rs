@@ -226,6 +226,11 @@ fn handle_switch(args: cli::Args) -> Result<(), Error> {
             )
             .unwrap();
             // Create the symlink
+            // TODO: Replace this with the symlink function
+            // and delete and re-create the symlink. Effectively,
+            // if file exists; then delete it; done; then create
+            // the symlink in every case as we will have deleted
+            // it if it previously existed.
             if !target.exists() {
                 Command::new("ln")
                     .arg("-s")
