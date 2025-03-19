@@ -226,17 +226,19 @@ fn handle_switch(args: cli::Args) -> Result<(), Error> {
             )
             .unwrap();
             // Create the symlink
-            Command::new("ln")
-                .arg("-s")
-                .arg(&path)
-                .arg(&target)
-                .output()
-                .map_err(|_| {
-                    Error::FailedToCreateSymlink(
-                        path.clone(),
-                        target.clone(),
-                    )
-                })?;
+            if !target.exists() {
+                Command::new("ln")
+                    .arg("-s")
+                    .arg(&path)
+                    .arg(&target)
+                    .output()
+                    .map_err(|_| {
+                        Error::FailedToCreateSymlink(
+                            path.clone(),
+                            target.clone(),
+                        )
+                    })?;
+            }
         }
     }
     Ok(())
