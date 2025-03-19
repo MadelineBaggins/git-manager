@@ -188,7 +188,7 @@ impl Repository {
                 "config",
                 "--local",
                 "receive.denyCurrentBranch",
-                "updateInstead",
+                "ignore",
             ])
             .current_dir(&store_path)
             .output()
