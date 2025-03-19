@@ -171,21 +171,19 @@ impl Repository {
     ) -> std::result::Result<PathBuf, crate::Error> {
         // Check if the repository already exists
         let store_path = store.join(&self.name);
-        if store_path.exists() {
-            return Ok(store_path);
-        }
-        // Create the repository
-        Command::new("git")
-            .arg("init")
-            .arg(&store_path)
-            .output()
-            .map_err(|_| {
-                crate::Error::FailedToInitRepository(
-                    store_path.clone(),
-                )
-            })?;
-        // Configure the repository to accept pushes
-        Command::new("git")
+        if !store_path.exists() {
+            // Create the repository
+            Command::new("git")
+                .arg("init")
+                .arg(&store_path)
+                .output()
+                .map_err(|_| {
+                    crate::Error::FailedToInitRepository(
+                        store_path.clone(),
+                    )
+                })?;
+            // Configure the repository to accept pushes
+            Command::new("git")
             .args([
                 "config",
                 "--local",
@@ -199,6 +197,7 @@ impl Repository {
                     store_path.clone(),
                 )
             })?;
+        }
         // Ensure the repositories hooks are correct
         self.hooks
             .update(&store_path.join(".git/hooks"))
