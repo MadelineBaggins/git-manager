@@ -206,6 +206,20 @@ fn handle_init(args: cli::Args) -> Result<(), Error> {
     Command::new("git").arg("init").output().map_err(
         |_| Error::FailedToInitRepository(".".into()),
     )?;
+    // Configure the git repository
+    Command::new("git")
+        .args([
+            "config",
+            "--local",
+            "receive.denyCurrentBranch",
+            "ignore",
+        ])
+        .output()
+        .map_err(|_| {
+            crate::Error::FailedToConfigureRepository(
+                ".".into(),
+            )
+        })?;
     Ok(())
 }
 
