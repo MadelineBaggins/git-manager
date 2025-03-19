@@ -225,7 +225,7 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Repository {
         Ok(Self {
             name: element.attribute::<&str>("name")?.into(),
             symlinks: element
-                .children::<Symlink>("symlinks")
+                .children::<Symlink>("symlink")
                 .collect::<xml::Result<_>>()?,
             hooks: Hooks::from_element(element)?,
         })
@@ -245,7 +245,7 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Config {
     ) -> xml::Result<'a, Self> {
         Ok(Self {
             store: element.child("store")?,
-            symlinks: element.child("symlink")?,
+            symlinks: element.child("symlinks")?,
             repositories: element
                 .children::<Repository>("repo")
                 .collect::<xml::Result<_>>()?,
