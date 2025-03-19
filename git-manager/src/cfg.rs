@@ -225,7 +225,7 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Repository {
         Ok(Self {
             name: element.attribute::<&str>("name")?.into(),
             symlinks: element
-                .children::<Symlink>("symlink")
+                .children::<Symlink>("symlinks")
                 .collect::<xml::Result<_>>()?,
             hooks: Hooks::from_element(element)?,
         })
