@@ -9,7 +9,7 @@ edition = "2021"
 license = "GPL-3.0-only"
 description = "A tool for managing git repositories"
 repository = "https://github.com/MadelineBaggins/git-manager"
-readme = "README.md"
+readme = "../README.md"
 keyworld = [ "git", "cli", "cvs", "server" ]
 
 [[bin]]
