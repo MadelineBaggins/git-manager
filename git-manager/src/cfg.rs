@@ -167,7 +167,9 @@ impl Repository {
     pub fn admin() -> Self {
         Repository {
             name: "admin".into(),
-            symlinks: vec![],
+            symlinks: vec![Symlink {
+                path: "admin".into(),
+            }],
             hooks: Hooks {
                 pre_receive: None,
                 update: None,
