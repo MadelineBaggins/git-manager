@@ -1,4 +1,5 @@
 <config>
+  <branch>$BRANCH</branch>
   <store>$STORE</store>
   <symlinks>$SYMLINKS</symlinks>
   <repo name="admin">

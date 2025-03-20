@@ -135,10 +135,14 @@ fn handle_init(
             "$SYMLINKS",
             args.symlinks.to_str().unwrap(),
         )
+        .replace("$BRANCH", &args.branch)
         .replace("$STORE", args.store.to_str().unwrap());
     // Initialize the admin repository
-    let admin = cfg::Repository::admin()
-        .switch(&args.symlinks, &args.store)?;
+    let admin = cfg::Repository::admin().switch(
+        &args.branch,
+        &args.symlinks,
+        &args.store,
+    )?;
     // Write the example configuration file
     std::fs::File::options()
         .write(true)
@@ -177,7 +181,11 @@ fn handle_switch(args: cli::Args) -> Result<(), Error> {
     // Reconfigure everything to match the config
     for repo in config.repositories {
         // Ensure the repository exists
-        repo.switch(&config.symlinks, &config.store)?;
+        repo.switch(
+            &config.branch,
+            &config.symlinks,
+            &config.store,
+        )?;
     }
     Ok(())
 }

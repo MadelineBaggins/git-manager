@@ -224,6 +224,7 @@ impl Repository {
     }
     pub fn switch(
         &self,
+        branch: &str,
         symlinks_dir: &Path,
         store_dir: &Path,
     ) -> std::result::Result<PathBuf, crate::Error> {
@@ -233,6 +234,8 @@ impl Repository {
             // Create the repository
             Command::new("git")
                 .arg("init")
+                .arg("-b")
+                .arg(branch)
                 .arg(&repository_path)
                 .output()?;
         }
@@ -309,6 +312,7 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Repository {
 
 #[derive(Debug)]
 pub struct Config {
+    pub branch: String,
     pub store: PathBuf,
     pub symlinks: PathBuf,
     pub repositories: Vec<Repository>,
@@ -319,6 +323,7 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Config {
         element: &'b xml::Element<'a>,
     ) -> xml::Result<'a, Self> {
         Ok(Self {
+            branch: element.child("branch")?,
             store: element.child("store")?,
             symlinks: element.child("symlinks")?,
             repositories: element

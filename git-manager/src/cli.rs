@@ -34,4 +34,6 @@ pub struct InitServerArgs {
     pub symlinks: std::path::PathBuf,
     #[arg(long)]
     pub store: std::path::PathBuf,
+    #[arg(long)]
+    pub branch: String,
 }
