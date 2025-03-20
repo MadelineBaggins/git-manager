@@ -2,10 +2,9 @@ use std::{
     fs::File,
     io::{Read, Write},
     path::PathBuf,
-    process::Command,
 };
 
-use cfg::Config;
+use cfg::{Config, Repository};
 use clap::Parser as _;
 use maddi_xml::{Content, FromElement, Parser};
 
@@ -22,8 +21,16 @@ mod cli {
 
     #[derive(clap::Subcommand)]
     pub enum Commands {
-        Init,
+        Init(InitArgs),
         Switch,
+    }
+
+    #[derive(clap::Args)]
+    pub struct InitArgs {
+        #[arg(long)]
+        pub symlinks: std::path::PathBuf,
+        #[arg(long)]
+        pub store: std::path::PathBuf,
     }
 }
 
@@ -31,15 +38,14 @@ const RED: &str = "\x1b[1;31m";
 const DEFAULT: &str = "\x1b[1;39m";
 
 pub enum Error {
-    FailedToOpenConfig(PathBuf),
-    FailedToReadConfig(PathBuf),
     MaddiXml(String),
-    FailedToInitRepository(PathBuf),
-    FailedToConfigureRepository(PathBuf),
-    FailedToCreateSymlink(PathBuf, PathBuf),
-    ConfigExists(PathBuf),
-    FailedToFindEnvVar(&'static str),
-    FailedToConfigureHooks(PathBuf),
+    IoError(std::io::Error),
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Error::IoError(err)
+    }
 }
 
 impl<'a> From<maddi_xml::Error<'a>> for Error {
@@ -54,68 +60,13 @@ impl std::fmt::Display for Error {
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
         match self {
-            Error::FailedToOpenConfig(path) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                write!(
+            Error::IoError(err) => {
+                writeln!(
                     f,
-                    "failed to open config file '{}'",
-                    path.display()
-                )
-            }
-            Error::FailedToReadConfig(path) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                write!(
-                    f,
-                    "failed to read config file '{}'",
-                    path.display()
+                    "{RED}Io Error:{DEFAULT}\n{err:?}"
                 )
             }
             Error::MaddiXml(raw) => write!(f, "{raw}"),
-            Error::FailedToInitRepository(path) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                write!(
-                    f,
-                    "failed to create repository '{}'",
-                    path.display()
-                )
-            }
-            Error::FailedToConfigureRepository(path) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                write!(
-                    f,
-                    "failed to configure repository '{}'",
-                    path.display()
-                )
-            }
-            Error::FailedToCreateSymlink(
-                source,
-                target,
-            ) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                write!(
-                    f,
-                    "failed to create symlink '{} -> {}'",
-                    source.display(),
-                    target.display()
-                )
-            }
-            Error::ConfigExists(path) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                let path = path.display();
-                write!(f, "config already exists at '{path}', could not initialize")
-            }
-            Error::FailedToFindEnvVar(var) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                write!(f, "failed to get env var '{var}'")
-            }
-            Error::FailedToConfigureHooks(path) => {
-                writeln!(f, "{RED}Error:{DEFAULT}")?;
-                write!(
-                    f,
-                    "failed configure hooks for '{}'",
-                    path.display(),
-                )
-            }
         }
     }
 }
@@ -123,14 +74,10 @@ impl std::fmt::Display for Error {
 impl Config {
     fn load(path: PathBuf) -> Result<Self, Error> {
         // Open the configuration file
-        let Ok(mut file) = File::open(&path) else {
-            return Err(Error::FailedToOpenConfig(path));
-        };
+        let mut file = File::open(&path)?;
         // Read in the configuration file
         let mut source = String::new();
-        if file.read_to_string(&mut source).is_err() {
-            return Err(Error::FailedToReadConfig(path));
-        };
+        file.read_to_string(&mut source)?;
         // Create the parser
         let mut parser = Parser::new(&path, &source);
         // Get the first piece of content in the file
@@ -178,48 +125,37 @@ fn main() {
 fn run(args: cli::Args) -> Result<(), Error> {
     // Run the command
     match args.command {
-        cli::Commands::Init => handle_init(args)?,
+        cli::Commands::Init(init_args) => {
+            handle_init(init_args)?
+        }
         cli::Commands::Switch => handle_switch(args)?,
     }
     Ok(())
 }
 
-fn handle_init(args: cli::Args) -> Result<(), Error> {
-    // Ensure the config file doesn't already exist
-    if args.config.exists() {
-        return Err(Error::ConfigExists(args.config));
-    }
+fn handle_init(args: cli::InitArgs) -> Result<(), Error> {
+    // Create the store
+    std::fs::create_dir_all(&args.store)?;
+    // create the symlinks dir
+    std::fs::create_dir_all(&args.symlinks)?;
     // Build the configuration file
-    let home = std::env::var_os("HOME")
-        .ok_or(Error::FailedToFindEnvVar("HOME"))?;
-    let config = include_str!("../config.xml")
-        .replace("$HOME", home.to_str().unwrap());
+    let config = include_str!("config.xml")
+        .replace(
+            "$SYMLINKS",
+            args.symlinks.to_str().unwrap(),
+        )
+        .replace("$STORE", args.store.to_str().unwrap());
+    // Initialize the admin repository
+    let admin = Repository::admin()
+        .switch(&args.symlinks, &args.store)?;
     // Write the example configuration file
     std::fs::File::options()
         .write(true)
         .create_new(true)
-        .open(args.config)
+        .open(admin.join("config.xml"))
         .unwrap()
         .write_all(config.as_bytes())
         .unwrap();
-    // Run git init
-    Command::new("git").arg("init").output().map_err(
-        |_| Error::FailedToInitRepository(".".into()),
-    )?;
-    // Configure the git repository
-    Command::new("git")
-        .args([
-            "config",
-            "--local",
-            "receive.denyCurrentBranch",
-            "ignore",
-        ])
-        .output()
-        .map_err(|_| {
-            crate::Error::FailedToConfigureRepository(
-                ".".into(),
-            )
-        })?;
     Ok(())
 }
 
@@ -231,34 +167,7 @@ fn handle_switch(args: cli::Args) -> Result<(), Error> {
     // Reconfigure everything to match the config
     for repo in config.repositories {
         // Ensure the repository exists
-        let path = repo.ensure_correct(&config.store)?;
-        // Create all the symlinks
-        for target in repo.symlinks(&config.symlinks) {
-            // Ensure the parent directory exists
-            std::fs::create_dir_all(
-                target.parent().unwrap(),
-            )
-            .unwrap();
-            // Create the symlink
-            // TODO: Replace this with the symlink function
-            // and delete and re-create the symlink. Effectively,
-            // if file exists; then delete it; done; then create
-            // the symlink in every case as we will have deleted
-            // it if it previously existed.
-            if !target.exists() {
-                Command::new("ln")
-                    .arg("-s")
-                    .arg(&path)
-                    .arg(&target)
-                    .output()
-                    .map_err(|_| {
-                        Error::FailedToCreateSymlink(
-                            path.clone(),
-                            target.clone(),
-                        )
-                    })?;
-            }
-        }
+        repo.switch(&config.symlinks, &config.store)?;
     }
     Ok(())
 }

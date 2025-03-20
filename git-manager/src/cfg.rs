@@ -53,7 +53,6 @@ pub enum Source {
     Inline(String),
     File(PathBuf),
 }
-
 impl<'a, 'b> xml::FromElement<'a, 'b> for Source {
     fn from_element(
         element: &'b xml::Element<'a>,
@@ -165,56 +164,83 @@ pub struct Repository {
 }
 
 impl Repository {
-    pub fn ensure_correct(
+    pub fn admin() -> Self {
+        Repository {
+            name: "admin".into(),
+            symlinks: vec![],
+            hooks: Hooks {
+                pre_receive: None,
+                update: None,
+                post_receive: Some(Source::Inline(
+                    include_str!("post-update.sh").into(),
+                )),
+            },
+        }
+    }
+    pub fn switch(
         &self,
-        store: &Path,
+        symlinks_dir: &Path,
+        store_dir: &Path,
     ) -> std::result::Result<PathBuf, crate::Error> {
         // Check if the repository already exists
-        let store_path = store.join(&self.name);
-        if !store_path.exists() {
+        let repository_path = store_dir.join(&self.name);
+        if !repository_path.exists() {
             // Create the repository
             Command::new("git")
                 .arg("init")
-                .arg(&store_path)
-                .output()
-                .map_err(|_| {
-                    crate::Error::FailedToInitRepository(
-                        store_path.clone(),
-                    )
-                })?;
-            // Configure the repository to accept pushes
-            Command::new("git")
+                .arg(&repository_path)
+                .output()?;
+        }
+        // Configure the repository to accept pushes
+        Command::new("git")
             .args([
                 "config",
                 "--local",
                 "receive.denyCurrentBranch",
                 "ignore",
             ])
-            .current_dir(&store_path)
-            .output()
-            .map_err(|_| {
-                crate::Error::FailedToConfigureRepository(
-                    store_path.clone(),
-                )
-            })?;
-        }
+            .current_dir(&repository_path)
+            .output()?;
         // Ensure the repositories hooks are correct
         self.hooks
-            .update(&store_path.join(".git/hooks"))
-            .map_err(|_| {
-            crate::Error::FailedToConfigureHooks(
-                store_path.clone(),
-            )
-        })?;
-        Ok(store_path)
+            .update(&repository_path.join(".git/hooks"))?;
+        // Create all the symlinks
+        self.build_symlinks(
+            &repository_path,
+            symlinks_dir,
+        )?;
+        Ok(repository_path)
     }
-    pub fn symlinks<'a, 'b>(
+    fn symlinks<'a, 'b>(
         &'a self,
         symlinks_dir: &'b Path,
     ) -> impl Iterator<Item = PathBuf> + use<'a, 'b> {
         self.symlinks
             .iter()
             .map(|s| symlinks_dir.join(&s.path))
+    }
+    fn build_symlinks(
+        &self,
+        repository_path: &Path,
+        symlinks_dir: &Path,
+    ) -> std::io::Result<()> {
+        // Create all the symlinks
+        for target in self.symlinks(symlinks_dir) {
+            // Ensure the parent directory exists
+            std::fs::create_dir_all(
+                target.parent().unwrap(),
+            )?;
+            // If the symlink exists, delete it.
+            if target.exists() {
+                std::fs::remove_file(&target)?;
+            }
+            // Create the symlink
+            std::os::unix::fs::symlink(
+                repository_path,
+                target,
+            )?;
+        }
+        Ok(())
     }
 }
 

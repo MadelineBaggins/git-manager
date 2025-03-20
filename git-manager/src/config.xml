@@ -1,6 +1,6 @@
 <config>
-  <store>$HOME/GitManager/store</store>
-  <symlinks>$HOME/GitManager</symlinks>
+  <store>$STORE</store>
+  <symlinks>$SYMLINKS</symlinks>
   <repo name="admin">
     <symlink>admin</symlink>
     <post-receive>
