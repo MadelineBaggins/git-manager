@@ -3,9 +3,18 @@
 # SPDX-License-Identifier: CC0-1.0
 
 [package]
-name = "git-manager"
+name = "maddi-git-manager"
 version = "0.2.0"
 edition = "2021"
+license = "GPL-3.0-only"
+description = "A tool for managing git repositories"
+repository = "https://github.com/MadelineBaggins/git-manager"
+readme = "README.md"
+keyworld = [ "git", "cli", "cvs", "server" ]
+
+[[bin]]
+name = "git-manager"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5.31", features = ["derive"] }
