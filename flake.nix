@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Madeline Baggins <declanbaggins@gmail.com>
+#
+# SPDX-License-Identifier: CC0-1.0
+
 {
   description = "A rust binary flake on nightly.";
 
