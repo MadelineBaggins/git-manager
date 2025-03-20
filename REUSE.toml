@@ -21,3 +21,19 @@ SPDX-License-Identifier = "CC0-1.0"
 path = "flake.lock"
 SPDX-FileCopyrightText = "NONE"
 SPDX-License-Identifier = "CC0-1.0"
+
+# .gitignore is trivial
+[[annotations]]
+path = ".gitignore"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "CC0-1.0"
+
+# Examples designed to be copied
+[[annotations]]
+path = "git-manager/src/config.xml"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "CC0-1.0"
+[[annotations]]
+path = "git-manager/src/post-update.sh"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "CC0-1.0"
