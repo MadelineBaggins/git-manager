@@ -37,3 +37,7 @@ SPDX-License-Identifier = "CC0-1.0"
 path = "git-manager/src/post-update.sh"
 SPDX-FileCopyrightText = "NONE"
 SPDX-License-Identifier = "CC0-1.0"
+[[annotations]]
+path = "smartget/example.xml"
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "CC0-1.0"

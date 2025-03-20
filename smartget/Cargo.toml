@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2025 Madeline Baggins <declanbaggins@gmail.com>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[package]
+name = "smartget"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
+maddi-xml = "0.1.2"

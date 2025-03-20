@@ -1,0 +1,5 @@
+<git-manager>
+  <alias>gm</alias>
+  <ssh>git@git.baggins.family</ssh>
+  <config>gm/store/admin</config>
+</git-manager>

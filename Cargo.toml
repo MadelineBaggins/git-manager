@@ -6,4 +6,5 @@
 resolver = "2"
 members = [
   "git-manager",
+  "smartget",
 ]
