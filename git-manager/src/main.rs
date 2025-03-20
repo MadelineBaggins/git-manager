@@ -5,7 +5,7 @@
 use std::{
     fs::File,
     io::{Read, Write},
-    path::PathBuf,
+    path::Path,
 };
 
 use maddi_xml as xml;
@@ -54,14 +54,14 @@ impl std::fmt::Display for Error {
 }
 
 impl cfg::Config {
-    fn load(path: PathBuf) -> Result<Self, Error> {
+    fn load(path: &Path) -> Result<Self, Error> {
         // Open the configuration file
-        let mut file = File::open(&path)?;
+        let mut file = File::open(path)?;
         // Read in the configuration file
         let mut source = String::new();
         file.read_to_string(&mut source)?;
         // Create the parser
-        let mut parser = xml::Parser::new(&path, &source);
+        let mut parser = xml::Parser::new(path, &source);
         // Get the first piece of content in the file
         let content =
             parser
@@ -115,6 +115,9 @@ fn run(args: cli::Args) -> Result<(), Error> {
             command: cli::InitCommands::Server(init_args),
         } => handle_init(init_args)?,
         cli::Commands::Switch => handle_switch(args)?,
+        cli::Commands::Search { ref search } => {
+            handle_search(&args, search)?
+        }
     }
     Ok(())
 }
@@ -147,9 +150,28 @@ fn handle_init(
     Ok(())
 }
 
+fn handle_search(
+    args: &cli::Args,
+    search: &str,
+) -> Result<(), Error> {
+    // Try to open the configuration file
+    let config = cfg::Config::load(&args.config)?;
+    // Print all the results out to stdout
+    let results = config.repositories.iter().filter_map(
+        |repository| {
+            repository
+                .smartget_filter_map(search, &config.store)
+        },
+    );
+    for result in results {
+        println!("{}", result);
+    }
+    Ok(())
+}
+
 fn handle_switch(args: cli::Args) -> Result<(), Error> {
     // Try to open the configuration file
-    let config = cfg::Config::load(args.config)?;
+    let config = cfg::Config::load(&args.config)?;
     // Print the configuration
     println!("{config:#?}");
     // Reconfigure everything to match the config

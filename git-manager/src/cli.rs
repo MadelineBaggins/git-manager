@@ -17,6 +17,10 @@ pub enum Commands {
         command: InitCommands,
     },
     Switch,
+    Search {
+        #[arg(default_value = "")]
+        search: String,
+    },
 }
 
 #[derive(clap::Subcommand)]

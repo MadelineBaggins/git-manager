@@ -160,20 +160,59 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Hooks {
     }
 }
 
+struct Tag(String);
+
+impl<'a, 'b> xml::FromElement<'a, 'b> for Tag {
+    fn from_element(
+        element: &'b xml::Element<'a>,
+    ) -> xml::Result<'a, Self> {
+        match element.contents.as_slice() {
+            [ maddi_xml::Content::Text(tag) ] => {
+                if tag.contains(char::is_whitespace) {
+                    Err(element.position.error("tag must not contain whitespace".into()))
+                } else {
+                    Ok(Tag(tag.into()))
+                }
+            },
+            _ => Err(element.position.error("expected tag to contain text with no whitespace".into())),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Repository {
     name: String,
     symlinks: Vec<Symlink>,
+    tags: Vec<String>,
     hooks: Hooks,
 }
 
 impl Repository {
+    pub fn smartget_filter_map(
+        &self,
+        search: &str,
+        store_dir: &Path,
+    ) -> Option<String> {
+        let matches =
+            search.split_whitespace().all(|term| {
+                self.tags
+                    .iter()
+                    .any(|tag| tag.contains(term))
+            }) || self.name.contains(search);
+        if !matches {
+            return None;
+        }
+        let store = store_dir.display();
+        let name = &self.name;
+        Some(format!("{name},git+ssh://{store}/{name}"))
+    }
     pub fn admin() -> Self {
         Repository {
             name: "admin".into(),
             symlinks: vec![Symlink {
                 path: "admin".into(),
             }],
+            tags: vec![],
             hooks: Hooks {
                 pre_receive: None,
                 update: None,
@@ -259,6 +298,10 @@ impl<'a, 'b> xml::FromElement<'a, 'b> for Repository {
             symlinks: element
                 .children::<Symlink>("symlink")
                 .collect::<xml::Result<_>>()?,
+            tags: element
+                .children::<Tag>("tag")
+                .map(|tag| tag.map(|tag| tag.0))
+                .collect::<Result<_, _>>()?,
             hooks: Hooks::from_element(element)?,
         })
     }
