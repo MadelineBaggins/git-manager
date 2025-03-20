@@ -176,8 +176,6 @@ fn handle_search(
 fn handle_switch(args: cli::Args) -> Result<(), Error> {
     // Try to open the configuration file
     let config = cfg::Config::load(&args.config)?;
-    // Print the configuration
-    println!("{config:#?}");
     // Reconfigure everything to match the config
     for repo in config.repositories {
         // Ensure the repository exists
