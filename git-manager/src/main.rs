@@ -4,35 +4,13 @@ use std::{
     path::PathBuf,
 };
 
-use cfg::{Config, Repository};
+use maddi_xml as xml;
+
 use clap::Parser as _;
-use maddi_xml::{Content, FromElement, Parser};
+use xml::FromElement as _;
 
 mod cfg;
-
-mod cli {
-    #[derive(clap::Parser)]
-    pub struct Args {
-        #[arg(short, default_value = "./config.xml")]
-        pub config: std::path::PathBuf,
-        #[command(subcommand)]
-        pub command: Commands,
-    }
-
-    #[derive(clap::Subcommand)]
-    pub enum Commands {
-        Init(InitArgs),
-        Switch,
-    }
-
-    #[derive(clap::Args)]
-    pub struct InitArgs {
-        #[arg(long)]
-        pub symlinks: std::path::PathBuf,
-        #[arg(long)]
-        pub store: std::path::PathBuf,
-    }
-}
+mod cli;
 
 const RED: &str = "\x1b[1;31m";
 const DEFAULT: &str = "\x1b[1;39m";
@@ -71,7 +49,7 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl Config {
+impl cfg::Config {
     fn load(path: PathBuf) -> Result<Self, Error> {
         // Open the configuration file
         let mut file = File::open(&path)?;
@@ -79,13 +57,17 @@ impl Config {
         let mut source = String::new();
         file.read_to_string(&mut source)?;
         // Create the parser
-        let mut parser = Parser::new(&path, &source);
+        let mut parser = xml::Parser::new(&path, &source);
         // Get the first piece of content in the file
         let content =
-            parser.parse::<Option<Result<Content, maddi_xml::Error>>>().transpose()?;
+            parser
+                .parse::<Option<
+                    Result<xml::Content, maddi_xml::Error>,
+                >>()
+                .transpose()?;
         // Ensure the content was an element named 'config'
         let element = match content {
-            Some(Content::Element(e)) => {
+            Some(xml::Content::Element(e)) => {
                 if e.name == "config" {
                     e
                 } else {
@@ -108,7 +90,7 @@ impl Config {
             }
         };
         // Get the config from the xml ast
-        let config = Config::from_element(&element)?;
+        let config = cfg::Config::from_element(&element)?;
         Ok(config)
     }
 }
@@ -125,15 +107,17 @@ fn main() {
 fn run(args: cli::Args) -> Result<(), Error> {
     // Run the command
     match args.command {
-        cli::Commands::Init(init_args) => {
-            handle_init(init_args)?
-        }
+        cli::Commands::Init {
+            command: cli::InitCommands::Server(init_args),
+        } => handle_init(init_args)?,
         cli::Commands::Switch => handle_switch(args)?,
     }
     Ok(())
 }
 
-fn handle_init(args: cli::InitArgs) -> Result<(), Error> {
+fn handle_init(
+    args: cli::InitServerArgs,
+) -> Result<(), Error> {
     // Create the store
     std::fs::create_dir_all(&args.store)?;
     // create the symlinks dir
@@ -146,7 +130,7 @@ fn handle_init(args: cli::InitArgs) -> Result<(), Error> {
         )
         .replace("$STORE", args.store.to_str().unwrap());
     // Initialize the admin repository
-    let admin = Repository::admin()
+    let admin = cfg::Repository::admin()
         .switch(&args.symlinks, &args.store)?;
     // Write the example configuration file
     std::fs::File::options()
@@ -161,7 +145,7 @@ fn handle_init(args: cli::InitArgs) -> Result<(), Error> {
 
 fn handle_switch(args: cli::Args) -> Result<(), Error> {
     // Try to open the configuration file
-    let config = Config::load(args.config)?;
+    let config = cfg::Config::load(args.config)?;
     // Print the configuration
     println!("{config:#?}");
     // Reconfigure everything to match the config
