@@ -4,7 +4,7 @@
 
 #[derive(clap::Parser)]
 pub struct Args {
-    #[arg(short, default_value = "./config.xml")]
+    #[arg(long, default_value = "./config.xml")]
     pub config: std::path::PathBuf,
     #[command(subcommand)]
     pub command: Commands,
