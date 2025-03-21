@@ -46,10 +46,17 @@ will download and install the binary. I'll eventually
 package this in some common distributions, but until then,
 this is the best way to go about it.
 
-Then run `git-manager init server`. It will prompt you to
+If you want to update git-manager in the future, just run
+`cargo install maddi-git-manager` again.
+
+Now run `git-manager init server`. It will prompt you to
 add flags that define the default branch name, in addition
 to the store directory and a root directory for symlinks to
 be created.
+
+You'll can find the `admin` repository inside the store or
+follow the symlink that was created inside the symlinks
+directory.
 
 ## Use
 
