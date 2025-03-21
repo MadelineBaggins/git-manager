@@ -33,6 +33,8 @@ allowing you to define `pre-receive`, `update`, and
 forwarding on changes to GitHub and is how the admin
 repository runs `git-manager` itself.
 
+### Example `admin` repository
+
 ```xml
 <!-- An example admin repository. -->
 <repo name="admin">
@@ -45,7 +47,18 @@ repository runs `git-manager` itself.
     /home/git/.cargo/bin/git-manager switch
   </post-receive>
 </repo>
+```
 
+### Example repository pushing upstream
+
+This `post-receiev` hook will fail the first time, but
+once you add your server's SSH keys to GitHub, and make an
+initial push manually from the server with something like
+`git push -u github main` to accept GitHub's public key,
+this hook should forward on changes on the main branch
+up to GitHub.
+
+```xml
 <!-- An example pushing to upstream. -->
 <repo name="2025-03-21-git-manager">
   <symlink>git-manager</symlink>
