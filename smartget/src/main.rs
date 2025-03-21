@@ -10,6 +10,7 @@ use maddi_xml::{Element, FromElement, Parser, Result};
 struct Args {
     #[arg(long)]
     config: Option<PathBuf>,
+    #[arg(default_value = "")]
     search: String,
 }
 
