@@ -4,7 +4,7 @@
 
 [package]
 name = "maddi-git-manager"
-version = "0.2.6"
+version = "0.2.7"
 edition = "2021"
 license = "GPL-3.0-only"
 description = "A tool for managing git repositories"
