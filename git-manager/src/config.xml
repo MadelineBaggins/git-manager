@@ -8,7 +8,7 @@
       #!/usr/bin/env bash
       cd ..
       git --git-dir=.git reset --hard
-      git-manager switch
+      $GIT_MANAGER switch
     </post-receive>
   </repo>
 </config>

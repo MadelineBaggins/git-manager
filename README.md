@@ -30,7 +30,22 @@ for.
 `git-manager` makes it easy to manage remote hooks too,
 allowing you to define `pre-receive`, `update`, and
 `post-receive` hooks. This is useful for doing things like
-forwarding on changes to GitHub for example.
+forwarding on changes to GitHub and is how the admin
+repository runs `git-manager` itself.
+
+```xml
+<!-- An example admin repository. -->
+<repo name="admin">
+  <symlink>admin</symlink>
+  <!-- Run git-manager switch when pushed
+  <post-receive>
+    #!/usr/bin/env bash
+    cd ..
+    git --git-dir=.git reset --hard
+    /home/git/.cargo/bin/git-manager switch
+  </post-receive>
+</repo>
+```
 
 `git-manager` also has a `git-manager search` command that
 allows you to search for repositories and is planned to be

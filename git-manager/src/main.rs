@@ -102,6 +102,13 @@ fn handle_init(
             "$SYMLINKS",
             args.symlinks.to_str().unwrap(),
         )
+        .replace(
+            "$GIT_MANAGER",
+            std::env::current_exe()
+                .unwrap()
+                .to_str()
+                .unwrap(),
+        )
         .replace("$BRANCH", &args.branch)
         .replace("$STORE", args.store.to_str().unwrap());
     // Initialize the admin repository
