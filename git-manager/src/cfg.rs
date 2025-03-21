@@ -256,6 +256,7 @@ impl Repository {
         cmd.args([
             "config",
             "--local",
+            "--git-dir=.git",
             "receive.denyCurrentBranch",
             "ignore",
         ])
