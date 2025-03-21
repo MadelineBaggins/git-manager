@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Madeline Baggins <declanbaggins@gmail.com>
+//
+// SPDX-License-Identifier: GPL-3.0-only
+
 use maddi_xml as xml;
 
 const RED: &str = "\x1b[1;31m";
