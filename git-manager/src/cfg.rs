@@ -244,6 +244,7 @@ impl Repository {
             // Create the repository
             let mut command = Command::new("git");
             command
+                .arg("--git-dir=.git")
                 .arg("init")
                 .arg("-b")
                 .arg(branch)
