@@ -1,1 +1,7 @@
-
+<ssh>
+  <remote>git@git.baggins.family</remote>
+  <command>/home/git/.cargo/bin/git-manager</command>
+  <arg>--config</arg>
+  <arg>/home/git/gm/admin/config.xml</arg>
+  <arg>search</arg>
+</ssh>
