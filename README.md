@@ -45,6 +45,26 @@ repository runs `git-manager` itself.
     /home/git/.cargo/bin/git-manager switch
   </post-receive>
 </repo>
+
+<!-- An example pushing to upstream. -->
+<repo name="2025-03-21-git-manager">
+  <symlink>git-manager</symlink>
+  <tag>github</tag>
+  <post-receive>
+    #!/usr/bin/env bash
+    cd ..
+    export GIT_DIR=.git
+    # Reset
+    git reset --hard
+    # Ensure the github remote exists
+    REMOTES=$(git remote)
+    if ! [[ $REMOTES = *"github"* ]]; then
+      git remote add github git@github.com:MadelineBaggins/git-manager.git
+    fi
+    # Push to the github remote
+    git push -u github main
+  </post-receive>
+</repo>
 ```
 
 `git-manager` also has a `git-manager search` command that
