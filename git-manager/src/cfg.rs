@@ -10,6 +10,8 @@ use std::{
 
 use maddi_xml as xml;
 
+use crate::ResultExt;
+
 #[derive(Debug)]
 struct Symlink {
     path: PathBuf,
@@ -97,34 +99,42 @@ impl Hooks {
     fn update_hook(
         path: &Path,
         source: &Option<Source>,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), crate::error::Error> {
         // Delete the file
         if source.is_none() && path.exists() {
-            return std::fs::remove_file(path);
+            return std::fs::remove_file(path)
+                .with(path)
+                .map_err(Into::into);
         }
         // Create/Update the content of the file
-        if let Some(content) =
-            source.clone().map(Source::value).transpose()?
+        if let Some(content) = source
+            .clone()
+            .map(Source::value)
+            .transpose()
+            .with(path)?
         {
             // Create/Update
             let mut file = std::fs::File::options()
                 .create(true)
                 .write(true)
                 .truncate(true)
-                .open(path)?;
-            file.write_all(content.as_bytes())?;
+                .open(path)
+                .with(path)?;
+            file.write_all(content.as_bytes())
+                .with(path)?;
             // Make the file executable
             Command::new("chmod")
                 .arg("+x")
                 .arg(path)
-                .output()?;
+                .output()
+                .with(path)?;
         }
         Ok(())
     }
     pub fn update(
         &self,
         hook_directory: &Path,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), crate::error::Error> {
         // Set up the pre_receive hook
         let pre_receive_file =
             hook_directory.join("pre-receive");
@@ -232,23 +242,24 @@ impl Repository {
         let repository_path = store_dir.join(&self.name);
         if !repository_path.exists() {
             // Create the repository
-            Command::new("git")
+            let mut command = Command::new("git");
+            command
                 .arg("init")
                 .arg("-b")
                 .arg(branch)
-                .arg(&repository_path)
-                .output()?;
+                .arg(&repository_path);
+            command.output().with(command)?;
         }
         // Configure the repository to accept pushes
-        Command::new("git")
-            .args([
-                "config",
-                "--local",
-                "receive.denyCurrentBranch",
-                "ignore",
-            ])
-            .current_dir(&repository_path)
-            .output()?;
+        let mut cmd = Command::new("git");
+        cmd.args([
+            "config",
+            "--local",
+            "receive.denyCurrentBranch",
+            "ignore",
+        ])
+        .current_dir(&repository_path);
+        cmd.output().with(cmd)?;
         // Ensure the repositories hooks are correct
         self.hooks
             .update(&repository_path.join(".git/hooks"))?;
@@ -271,22 +282,23 @@ impl Repository {
         &self,
         repository_path: &Path,
         symlinks_dir: &Path,
-    ) -> std::io::Result<()> {
+    ) -> Result<(), crate::error::Error> {
         // Create all the symlinks
         for target in self.symlinks(symlinks_dir) {
             // Ensure the parent directory exists
-            std::fs::create_dir_all(
-                target.parent().unwrap(),
-            )?;
+            let parent = target.parent().unwrap();
+            std::fs::create_dir_all(parent).with(parent)?;
             // If the symlink exists, delete it.
             if target.exists() {
-                std::fs::remove_file(&target)?;
+                std::fs::remove_file(&target)
+                    .with(target.as_path())?;
             }
             // Create the symlink
             std::os::unix::fs::symlink(
                 repository_path,
-                target,
-            )?;
+                &target,
+            )
+            .with([repository_path, target.as_path()])?;
         }
         Ok(())
     }

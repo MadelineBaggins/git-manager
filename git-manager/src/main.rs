@@ -11,55 +11,20 @@ use std::{
 use maddi_xml as xml;
 
 use clap::Parser as _;
+use error::*;
 use xml::FromElement as _;
 
 mod cfg;
 mod cli;
-
-const RED: &str = "\x1b[1;31m";
-const DEFAULT: &str = "\x1b[1;39m";
-
-pub enum Error {
-    MaddiXml(String),
-    IoError(std::io::Error),
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Self {
-        Error::IoError(err)
-    }
-}
-
-impl<'a> From<maddi_xml::Error<'a>> for Error {
-    fn from(value: maddi_xml::Error<'a>) -> Self {
-        Self::MaddiXml(format!("{value}"))
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(
-        &self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
-        match self {
-            Error::IoError(err) => {
-                writeln!(
-                    f,
-                    "{RED}Io Error:{DEFAULT}\n{err:?}"
-                )
-            }
-            Error::MaddiXml(raw) => write!(f, "{raw}"),
-        }
-    }
-}
+mod error;
 
 impl cfg::Config {
     fn load(path: &Path) -> Result<Self, Error> {
         // Open the configuration file
-        let mut file = File::open(path)?;
+        let mut file = File::open(path).with(path)?;
         // Read in the configuration file
         let mut source = String::new();
-        file.read_to_string(&mut source)?;
+        file.read_to_string(&mut source).with(path)?;
         // Create the parser
         let mut parser = xml::Parser::new(path, &source);
         // Get the first piece of content in the file
@@ -126,9 +91,11 @@ fn handle_init(
     args: cli::InitServerArgs,
 ) -> Result<(), Error> {
     // Create the store
-    std::fs::create_dir_all(&args.store)?;
+    std::fs::create_dir_all(&args.store)
+        .with(args.store.as_path())?;
     // create the symlinks dir
-    std::fs::create_dir_all(&args.symlinks)?;
+    std::fs::create_dir_all(&args.symlinks)
+        .with(args.store.as_path())?;
     // Build the configuration file
     let config = include_str!("config.xml")
         .replace(
