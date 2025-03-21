@@ -37,7 +37,7 @@ repository runs `git-manager` itself.
 <!-- An example admin repository. -->
 <repo name="admin">
   <symlink>admin</symlink>
-  <!-- Run git-manager switch when pushed
+  <!-- Run `git-manager switch` when pushed. -->
   <post-receive>
     #!/usr/bin/env bash
     cd ..
