@@ -27,7 +27,7 @@ impl<C: Context> From<With<std::io::Error, C>> for Error {
         let kind = C::KIND;
         let context = context.display();
         Self(format!(
-            "{RED}IO Error with {kind}{DEFAULT}\n\t{context}\n{RED}Error:{DEFAULT}\n{inner:?}"
+            "{RED}IO Error with {kind}{DEFAULT}\n\t{context}\n{RED}Error:{DEFAULT}\n\t{inner:?}"
         ))
     }
 }
