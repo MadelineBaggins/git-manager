@@ -51,7 +51,7 @@ repository runs `git-manager` itself.
 
 ### Example repository pushing upstream
 
-This `post-receiev` hook will fail the first time, but
+This `post-receive` hook will fail the first time, but
 once you add your server's SSH keys to GitHub, and make an
 initial push manually from the server with something like
 `git push -u github main` to accept GitHub's public key,
