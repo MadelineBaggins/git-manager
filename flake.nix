@@ -36,7 +36,7 @@
     in with pkgs; {
       defaultPackage = stable-platform.buildRustPackage {
         pname = "git-manager";
-        version = "0.2.0";
+        version = "0.2.7";
         src = ./.;
         buildAndTestSubdir = "git-manager";
         cargoLock = {
