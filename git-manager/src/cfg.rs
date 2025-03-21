@@ -254,9 +254,9 @@ impl Repository {
         // Configure the repository to accept pushes
         let mut cmd = Command::new("git");
         cmd.args([
+            "--git-dir=.git",
             "config",
             "--local",
-            "--git-dir=.git",
             "receive.denyCurrentBranch",
             "ignore",
         ])
