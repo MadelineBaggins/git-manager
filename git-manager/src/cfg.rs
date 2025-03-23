@@ -214,7 +214,7 @@ impl Repository {
         }
         let store = store_dir.display();
         let name = &self.name;
-        Some(format!("{name},git+ssh://{store}/{name}"))
+        Some(format!("<git><alias>{name}</alias><root>{store}/{name}</root></git>"))
     }
     pub fn admin() -> Self {
         Repository {
