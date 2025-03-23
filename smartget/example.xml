@@ -5,3 +5,12 @@
   <arg>/home/git/gm/admin/config.xml</arg>
   <arg>search</arg>
 </ssh>
+<git>
+  <alias>2025-03-21-git-manager</alias>
+  <remote>git@git.baggins.family</remote>
+  <path>/home/git/gm/store/2025-03-21-git-manager</path>
+</git>
+<scp>
+  <remote>git@git.baggins.family</remote>
+  <path>/come/git/gm/store/admin/config.xml</path>
+<scp>

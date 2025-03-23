@@ -41,7 +41,7 @@ trait Remote {
 }
 
 struct Ssh {
-    remote: String,
+    remote: Option<String>,
     command: String,
     args: Vec<String>,
 }
@@ -51,7 +51,7 @@ impl<'a, 'b> FromElement<'a, 'b> for Ssh {
         element: &'b Element<'a>,
     ) -> Result<'a, Self> {
         Ok(Self {
-            remote: element.child("remote")?,
+            remote: element.optional_child("remote")?,
             command: element.child("command")?,
             args: element
                 .children("arg")
@@ -72,7 +72,7 @@ impl Remote for Ssh {
         command.push('\'');
         String::from_utf8_lossy(
             &Command::new("ssh")
-                .arg(&self.remote)
+                .arg(self.remote.as_ref().unwrap())
                 .arg("-t")
                 .arg(command)
                 .output()
